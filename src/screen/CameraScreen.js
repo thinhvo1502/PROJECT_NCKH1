@@ -1,37 +1,26 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, Text, Alert, Linking} from 'react-native';
-import { Camera, useCameraDevices } from 'react-native-vision-camera';
+import { StyleSheet, View, TouchableOpacity, Text, Alert, Linking } from 'react-native';
+import { Camera, useCameraDevices, useCameraPermission, useCameraDevice} from 'react-native-vision-camera';
 import Tts from 'react-native-tts';
 
 const VisionCameraScreen = () => {
   const [cameraPosition, setCameraPosition] = useState('back');
-  const [hasPermission, setHasPermission] = useState(false);
+  const { hasPermission, requestPermission } = useCameraPermission();
   const camera = useRef(null);
   const devices = useCameraDevices();
-  const device = devices[cameraPosition];
+  const device = useCameraDevice(cameraPosition);
 
-  // Kiểm tra và yêu cầu quyền truy cập camera
   useEffect(() => {
-    checkPermissions();
+    checkPermission();
   }, []);
 
-  const checkPermissions = async () => {
-    const cameraPermission = Camera.getCameraPermissionStatus();
-    // const microphonePermission = await Camera.getMicrophonePermissionStatus();
-    
-    if (cameraPermission === 'denied') {
-      console.log('hah')
-      const newCameraPermission = await Camera.requestCameraPermission();
-      // const newMicrophonePermission = await Camera.requestMicrophonePermission();
-      
-      if (newCameraPermission === 'authorized') {
-        setHasPermission(true);
-        Tts.speak('Đã được cấp quyền truy cập camera');
-      } else {
-        setHasPermission(false);
+  const checkPermission = useCallback(async () => {
+    if (!hasPermission) {
+      const newPermission = await requestPermission();
+      if (!newPermission) {
         Alert.alert(
           'Cần quyền truy cập',
-          'Ứng dụng cần quyền truy cập camerađể hoạt động',
+          'Ứng dụng cần quyền truy cập camera để hoạt động',
           [
             {
               text: 'Đi đến Cài đặt',
@@ -43,13 +32,12 @@ const VisionCameraScreen = () => {
             },
           ],
         );
-        Tts.speak('Ứng dụng cần quyền truy cập camera và microphone để hoạt động');
+        Tts.speak('Ứng dụng cần quyền truy cập camera để hoạt động');
+      } else {
+        Tts.speak('Đã được cấp quyền truy cập camera');
       }
-    } else if (cameraPermission === 'authorized') {
-      console.log('huu')
-      setHasPermission(true);
     }
-  };
+  }, [hasPermission, requestPermission]);
 
   const toggleCameraPosition = useCallback(() => {
     setCameraPosition(p => (p === 'back' ? 'front' : 'back'));
@@ -71,19 +59,21 @@ const VisionCameraScreen = () => {
     }
   }, []);
 
-  // Hiển thị màn hình loading khi chưa có thiết bị camera
-  // if (device == null) {
-  //   return <Text>Đang tải camera...</Text>;
-  // }
+  if (device == null) {
+    return (
+      <View style={styles.centered}>
+        <Text>Đang tải camera...</Text>
+      </View>
+    );
+  }
 
-  // Hiển thị thông báo khi chưa được cấp quyền
   if (!hasPermission) {
     return (
       <View style={styles.container}>
         <Text style={styles.permissionText}>
           Vui lòng cấp quyền truy cập camera để sử dụng ứng dụng
         </Text>
-        <TouchableOpacity style={styles.button} onPress={checkPermissions}>
+        <TouchableOpacity style={styles.button} onPress={checkPermission}>
           <Text style={styles.buttonText}>Yêu cầu quyền truy cập</Text>
         </TouchableOpacity>
       </View>
@@ -98,7 +88,6 @@ const VisionCameraScreen = () => {
         device={device}
         isActive={true}
         photo={true}
-        // audio={true}
       />
       <View style={styles.buttonContainer}>
         <TouchableOpacity onPress={toggleCameraPosition} style={styles.button}>
@@ -143,6 +132,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 20,
     marginBottom: 20,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
